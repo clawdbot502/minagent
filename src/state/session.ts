@@ -1,4 +1,4 @@
-import { appendFileSync, readFileSync, existsSync, mkdirSync, writeFileSync, chmodSync } from 'fs';
+import { appendFileSync, readFileSync, existsSync, mkdirSync, writeFileSync, chmodSync, renameSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import type { Message } from '../types.js';
@@ -122,6 +122,31 @@ export function saveSessionState(messages: Message[], metadata?: Record<string, 
     chmodSync(statePath, 0o600);
   } catch {
     // Best effort on non-POSIX platforms
+  }
+}
+
+export function archiveSessionState(): void {
+  const sessionDir = getSessionDir();
+  const statePath = join(sessionDir, 'last-state.json');
+  if (!existsSync(statePath)) return;
+
+  const archiveName = `session-archive-${Date.now()}.json`;
+  const archivePath = join(sessionDir, archiveName);
+  try {
+    renameSync(statePath, archivePath);
+  } catch {
+    // Ignore archive failures
+  }
+}
+
+export function clearSessionState(): void {
+  const statePath = join(getSessionDir(), 'last-state.json');
+  if (existsSync(statePath)) {
+    try {
+      unlinkSync(statePath);
+    } catch {
+      // Ignore cleanup failures
+    }
   }
 }
 
