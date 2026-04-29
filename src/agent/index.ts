@@ -378,9 +378,6 @@ Node/Bun version: ${process.version}`;
         if (chunk.toolCalls) {
           assistantToolCalls = chunk.toolCalls;
         }
-        if (chunk.done) {
-          callbacks.onComplete();
-        }
       }
 
       const assistantMsg: Message = {
@@ -398,10 +395,12 @@ Node/Bun version: ${process.version}`;
       recordMessage(assistantMsg);
 
       if (!assistantToolCalls || assistantToolCalls.length === 0) {
+        callbacks.onComplete();
         break;
       }
 
       callbacks.onToolCalls(assistantToolCalls);
+      callbacks.onComplete();
 
       // Interactive user questions are handled by the host UI instead of
       // returning a placeholder string and letting the model continue.

@@ -1,5 +1,5 @@
 import { Box, Text, useInput } from 'ink';
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 
 interface InputBoxProps {
   onSubmit: (input: string) => void;
@@ -14,6 +14,12 @@ export function InputBox({ onSubmit, disabled, activeSkill, commands = [] }: Inp
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const historyRef = useRef<string[]>([]);
+
+  // Keep latest refs for useInput callback to avoid stale closure issues
+  const disabledRef = useRef(disabled);
+  const onSubmitRef = useRef(onSubmit);
+  useEffect(() => { disabledRef.current = disabled; }, [disabled]);
+  useEffect(() => { onSubmitRef.current = onSubmit; }, [onSubmit]);
 
   const suggestions = useMemo(() => {
     if (!input.startsWith('/')) return [];
@@ -41,7 +47,7 @@ export function InputBox({ onSubmit, disabled, activeSkill, commands = [] }: Inp
   }, []);
 
   useInput((inputChar, key) => {
-    if (disabled) return;
+    if (disabledRef.current) return;
 
     if (key.tab) {
       applySuggestion();
@@ -55,7 +61,7 @@ export function InputBox({ onSubmit, disabled, activeSkill, commands = [] }: Inp
         const trimmed = input.trim();
         if (trimmed) {
           addToHistory(trimmed);
-          onSubmit(trimmed);
+          onSubmitRef.current(trimmed);
           setInput('');
         }
       }
