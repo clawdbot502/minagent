@@ -58,7 +58,7 @@ cd minagent
 bun install
 ```
 
-##3 3. Configure / 配置
+### 3. Configure / 配置
 
 Set your API key and model via environment variables:  
 通过环境变量配置 API Key 和模型：
@@ -88,6 +88,41 @@ bun run src/main.tsx
 # or / 或
 bun start
 ```
+
+开发调试用热重载：
+```bash
+bun --hot run src/main.tsx
+```
+
+### 5. Permission Modes / 权限模式（可选）
+
+```bash
+export MINA_PERMISSION_MODE=default           # 默认：破坏性工具需确认
+export MINA_PERMISSION_MODE=acceptEdits       # 自动接受文件编辑，bash 仍需确认
+export MINA_PERMISSION_MODE=bypassPermissions # 跳过所有确认（危险）
+export MINA_PERMISSION_MODE=dontAsk           # 从不询问（危险）
+```
+
+### 6. Common Commands / 常用命令速查
+
+| 命令 | 作用 |
+|------|------|
+| `/quit` `/exit` | 退出并保存会话 |
+| `/help` | 查看所有命令 |
+| `/plan` | 进入批量审批模式 |
+| `/act` | 退出 plan 模式 |
+| `/clear` | 清空当前会话 |
+| `/config KEY VALUE` | 修改配置 |
+| `/permissions` | 查看当前权限模式 |
+| `/skills` | 查看可用 skills |
+| `/add <file>` | 添加文件到上下文 |
+| `/changes` | 查看本次会话修改的文件 |
+
+### 7. Exit / 退出
+
+- 正常退出：输入 `/quit` 或 `/exit`
+- 强制退出：按 `Ctrl + C`
+- 进程卡死：另开终端执行 `pkill -f "bun run src/main.tsx"`
 
 ---
 
@@ -119,10 +154,10 @@ Type `/` followed by a command name. Use **Tab** for autocomplete.
 ### GitHub
 `/pr`, `/pr-view`, `/pr-create`, `/issue`, `/issue-view`, `/repo`
 
-##3 Session / 会话
+### Session / 会话
 `/clear`, `/compact`, `/resume`, `/tokens`, `/cost`, `/sessions`
 
-##3 Context / 上下文
+### Context / 上下文
 `/add <file>`, `/drop <file>`, `/context`
 
 ### System / 系统
