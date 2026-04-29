@@ -53,12 +53,12 @@ curl -fsSL https://bun.sh/install | bash
 ### 2. Clone & Install / 克隆并安装
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/minagent.git
+git clone https://github.com/BruceL017/minagent.git
 cd minagent
 bun install
 ```
 
-### 3. Configure / 配置
+##3 3. Configure / 配置
 
 Set your API key and model via environment variables:  
 通过环境变量配置 API Key 和模型：
@@ -119,10 +119,10 @@ Type `/` followed by a command name. Use **Tab** for autocomplete.
 ### GitHub
 `/pr`, `/pr-view`, `/pr-create`, `/issue`, `/issue-view`, `/repo`
 
-### Session / 会话
+##3 Session / 会话
 `/clear`, `/compact`, `/resume`, `/tokens`, `/cost`, `/sessions`
 
-### Context / 上下文
+##3 Context / 上下文
 `/add <file>`, `/drop <file>`, `/context`
 
 ### System / 系统
