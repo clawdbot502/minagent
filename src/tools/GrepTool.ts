@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { z } from 'zod';
 import type { Tool } from './types.js';
 
@@ -17,57 +17,65 @@ export const GrepTool: Tool<typeof GrepToolSchema> = {
   schema: GrepToolSchema,
   async execute(args) {
     try {
-      const cmdParts = ['rg'];
+      const cmdArgs: string[] = [];
 
       if (!args.case_sensitive) {
-        cmdParts.push('-i');
+        cmdArgs.push('-i');
       }
 
-      cmdParts.push('--line-number');
-      cmdParts.push('--color=never');
-      cmdParts.push('--max-count=5');
-      cmdParts.push('--max-columns=400');
+      cmdArgs.push('--line-number');
+      cmdArgs.push('--color=never');
+      cmdArgs.push('--max-count=5');
+      cmdArgs.push('--max-columns=400');
 
       const contextLines = args.context_lines ?? 2;
       if (contextLines > 0) {
-        cmdParts.push('-C', String(contextLines));
+        cmdArgs.push('-C', String(contextLines));
       }
 
       if (args.include) {
-        cmdParts.push('-g', args.include);
+        cmdArgs.push('-g', args.include);
       }
       if (args.exclude) {
-        cmdParts.push('-g', `!${args.exclude}`);
+        cmdArgs.push('-g', `!${args.exclude}`);
       }
 
       // Exclude common non-source directories by default
-      cmdParts.push('-g', '!node_modules');
-      cmdParts.push('-g', '!dist');
-      cmdParts.push('-g', '!build');
-      cmdParts.push('-g', '!.git');
+      cmdArgs.push('-g', '!node_modules');
+      cmdArgs.push('-g', '!dist');
+      cmdArgs.push('-g', '!build');
+      cmdArgs.push('-g', '!.git');
 
-      cmdParts.push('-e', args.pattern);
+      cmdArgs.push('-e', args.pattern);
 
       if (args.path) {
-        cmdParts.push(args.path);
+        cmdArgs.push(args.path);
       } else {
-        cmdParts.push('.');
+        cmdArgs.push('.');
       }
 
-      const result = execSync(cmdParts.join(' '), {
+      const result = spawnSync('rg', cmdArgs, {
         encoding: 'utf-8',
         maxBuffer: 5 * 1024 * 1024,
         timeout: 30000,
       });
+      if (result.error) {
+        return result.error.message.includes('ENOENT')
+          ? 'Error: ripgrep (rg) not installed. Install it first.'
+          : `Error: ${result.error.message}`;
+      }
+      if (result.status === 1) return '(no matches)';
+      if (result.status !== 0) {
+        return `Error: ${result.stderr || `rg exited with code ${result.status}`}`;
+      }
 
-      const lines = result.split('\n').filter((l) => l.trim());
+      const output = result.stdout || '';
+      const lines = output.split('\n').filter((l) => l.trim());
       if (lines.length > 300) {
         return lines.slice(0, 300).join('\n') + `\n... [${lines.length - 300} more lines]`;
       }
-      return result || '(no matches)';
+      return output || '(no matches)';
     } catch (err: any) {
-      if (err.status === 1) return '(no matches)';
-      if (err.status === 127) return 'Error: ripgrep (rg) not installed. Install it first.';
       return `Error: ${err.message}`;
     }
   },

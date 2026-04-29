@@ -42,7 +42,7 @@ export const defaultTools: ToolRegistry = {
 };
 
 export const DESTRUCTIVE_TOOLS = new Set([
-  'BashTool', 'FileWriteTool', 'FileEditTool', 'DeleteTool', 'CodeExecuteTool', 'AgentTool',
+  'BashTool', 'FileWriteTool', 'FileEditTool', 'DeleteTool', 'CodeExecuteTool', 'AgentTool', 'NotebookEditTool', 'MCPTool',
 ]);
 
 export const READONLY_TOOLS = new Set([

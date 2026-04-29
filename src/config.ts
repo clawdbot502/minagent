@@ -57,7 +57,7 @@ export function loadConfig(): Config {
   };
 }
 
-export function validateConfig(config: Config): void {
+export function getConfigErrors(config: Config): string[] {
   const errors: string[] = [];
 
   if (!config.apiKey) {
@@ -68,15 +68,25 @@ export function validateConfig(config: Config): void {
     errors.push('Missing model name. Set MINA_MODEL environment variable (e.g., gpt-4o, claude-sonnet-4-6, llama3.1:8b, etc.).');
   }
 
-  if (errors.length > 0) {
+  return errors;
+}
+
+export function formatConfigErrors(errors: string[]): string {
+  return errors.join('\n') +
+    '\n\nExample configuration:' +
+    '\n  /config MINA_PROVIDER generic  # openai | anthropic | generic' +
+    '\n  /config MINA_API_KEY ...' +
+    '\n  /config MINA_MODEL ...' +
+    '\n  /config MINA_BASE_URL ...' +
+    '\n  /config MINA_CONTEXT_WINDOW 128000  (optional)' +
+    '\n\nOr set the same values with environment variables before startup.';
+}
+
+export function validateConfig(config: Config, options: { allowMissing?: boolean } = {}): void {
+  const errors = getConfigErrors(config);
+  if (errors.length > 0 && options.allowMissing === false) {
     throw new Error(
-      errors.join('\n') +
-      '\n\nExample configuration:' +
-      '\n  export MINA_PROVIDER="generic"  # openai | anthropic | generic' +
-      '\n  export MINA_API_KEY="..."' +
-      '\n  export MINA_MODEL="..."' +
-      '\n  export MINA_BASE_URL="..."' +
-      '\n  export MINA_CONTEXT_WINDOW=128000  (optional)'
+      formatConfigErrors(errors)
     );
   }
 }

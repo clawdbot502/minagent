@@ -6,8 +6,12 @@ export interface PersistentConfig {
   [key: string]: string;
 }
 
+function getConfigDir(): string {
+  return process.env.MINA_CONFIG_DIR || join(homedir(), '.minagent');
+}
+
 function getConfigPath(): string {
-  return join(homedir(), '.minagent', 'config.json');
+  return join(getConfigDir(), 'config.json');
 }
 
 function ensurePrivateDir(path: string): void {
@@ -42,7 +46,7 @@ export function loadPersistentConfig(): PersistentConfig {
 
 export function savePersistentConfig(config: PersistentConfig): void {
   const path = getConfigPath();
-  const dir = join(homedir(), '.minagent');
+  const dir = getConfigDir();
   ensurePrivateDir(dir);
   writeFileSync(path, JSON.stringify(config, null, 2), { encoding: 'utf-8', mode: 0o600 });
   ensurePrivateFile(path);

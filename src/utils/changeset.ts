@@ -1,5 +1,3 @@
-import { readFileSync, existsSync } from 'fs';
-
 export interface FileChange {
   filePath: string;
   action: 'created' | 'modified' | 'deleted';

@@ -1,10 +1,10 @@
 import type { Message, ToolCall, ToolResult } from '../types.js';
-import type { Config } from '../config.js';
+import { loadConfig, validateConfig, type Config } from '../config.js';
 import type { PermissionMode } from '../utils/permissions.js';
 import type { ToolRegistry } from '../tools/types.js';
 import type { SkillRegistry } from '../skills/registry.js';
 import type { ContextManager } from '../utils/context.js';
-import type { CostTracker } from '../utils/costTracker.js';
+import { CostTracker } from '../utils/costTracker.js';
 import { filterToolsForSkill } from '../skills/toolFilter.js';
 import { createLLMClient } from './llm.js';
 import { executeToolCalls } from './toolExecutor.js';
@@ -13,7 +13,7 @@ import { DESTRUCTIVE_TOOLS } from '../tools/index.js';
 import { recordMessage } from '../state/session.js';
 import { shouldCompact, compactMessages, estimateTokens } from '../utils/compaction.js';
 import { classifyLLMError } from '../utils/llmErrors.js';
-import { ChangesetTracker } from '../utils/changeset.js';
+import { globalChangeset, type ChangesetTracker } from '../utils/changeset.js';
 import { readFileSync } from 'fs';
 import { spawnSync } from 'child_process';
 
@@ -56,7 +56,7 @@ export class Agent {
     this.costTracker = costTracker;
     this.llm = createLLMClient(config);
     this.permissionMode = (process.env.MINA_PERMISSION_MODE as PermissionMode) || 'default';
-    this.changeset = new ChangesetTracker();
+    this.changeset = globalChangeset;
   }
 
   getMessages(): Message[] {
@@ -82,6 +82,12 @@ export class Agent {
 
   getPermissionMode(): PermissionMode {
     return this.permissionMode;
+  }
+
+  reloadConfig(config: Config = loadConfig()): void {
+    this.config = config;
+    this.llm = createLLMClient(config);
+    this.costTracker = new CostTracker(config.model);
   }
 
   getContextFilePaths(): string[] {
@@ -275,6 +281,13 @@ Node/Bun version: ${process.version}`;
   }
 
   async sendMessage(content: string, callbacks: AgentCallbacks): Promise<void> {
+    try {
+      validateConfig(this.config, { allowMissing: false });
+    } catch (err: any) {
+      callbacks.onError(err.message);
+      return;
+    }
+
     // Parse @mentions and auto-add files to context
     const { cleanedContent, addedFiles } = this.parseMentions(content);
     if (addedFiles.length > 0) {
