@@ -27,9 +27,13 @@ export function App({ config, tools, skills }: AppProps) {
   const [currentReasoning, setCurrentReasoning] = useState('');
   const [activeSkill, setActiveSkill] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pendingPermission, setPendingPermission] = useState<{ toolName: string; args: Record<string, unknown>; resolve: (v: boolean) => void } | null>(null);
-  const [pendingPlan, setPendingPlan] = useState<{ calls: ToolCall[]; resolve: (v: boolean) => void } | null>(null);
-  const [pendingUserQuestion, setPendingUserQuestion] = useState<{ question: string; options?: string[]; resolve: (v: string) => void } | null>(null);
+  const pendingPermissionRef = useRef<{ resolve: (v: boolean) => void } | null>(null);
+  const pendingPlanRef = useRef<{ resolve: (v: boolean) => void } | null>(null);
+  const pendingUserQuestionRef = useRef<{ resolve: (v: string) => void } | null>(null);
+
+  const [pendingPermission, setPendingPermission] = useState<{ toolName: string; args: Record<string, unknown> } | null>(null);
+  const [pendingPlan, setPendingPlan] = useState<{ calls: ToolCall[] } | null>(null);
+  const [pendingUserQuestion, setPendingUserQuestion] = useState<{ question: string; options?: string[] } | null>(null);
   const [contextFiles, setContextFiles] = useState<string[]>([]);
   const toolResultsRef = useRef(new Map<string, ToolResult[]>());
   const contextManagerRef = useRef(new ContextManager());
@@ -74,19 +78,22 @@ export function App({ config, tools, skills }: AppProps) {
 
   const handlePermission = useCallback(async (toolName: string, args: Record<string, unknown>): Promise<boolean> => {
     return new Promise((resolve) => {
-      setPendingPermission({ toolName, args, resolve });
+      pendingPermissionRef.current = { resolve };
+      setPendingPermission({ toolName, args });
     });
   }, []);
 
   const handlePlan = useCallback(async (calls: ToolCall[]): Promise<boolean> => {
     return new Promise((resolve) => {
-      setPendingPlan({ calls, resolve });
+      pendingPlanRef.current = { resolve };
+      setPendingPlan({ calls });
     });
   }, []);
 
   const handleUserQuestion = useCallback(async (question: string, options?: string[]): Promise<string> => {
     return new Promise((resolve) => {
-      setPendingUserQuestion({ question, options, resolve });
+      pendingUserQuestionRef.current = { resolve };
+      setPendingUserQuestion({ question, options });
     });
   }, []);
 
@@ -96,33 +103,36 @@ export function App({ config, tools, skills }: AppProps) {
       if (shouldIgnoreSubmit({ isProcessing, hasPendingApproval })) return;
 
       // Handle permission response
-      if (pendingPermission) {
+      if (pendingPermissionRef.current) {
         const decision = parseApprovalInput(input);
         if (decision === null) {
           setError('Permission prompt expects y/yes or n/no.');
           return;
         }
         setError(null);
-        pendingPermission.resolve(decision);
+        pendingPermissionRef.current.resolve(decision);
+        pendingPermissionRef.current = null;
         setPendingPermission(null);
         return;
       }
 
-      if (pendingPlan) {
+      if (pendingPlanRef.current) {
         const decision = parseApprovalInput(input);
         if (decision === null) {
           setError('Plan prompt expects y/yes or n/no.');
           return;
         }
         setError(null);
-        pendingPlan.resolve(decision);
+        pendingPlanRef.current.resolve(decision);
+        pendingPlanRef.current = null;
         setPendingPlan(null);
         return;
       }
 
-      if (pendingUserQuestion) {
+      if (pendingUserQuestionRef.current) {
         setError(null);
-        pendingUserQuestion.resolve(input);
+        pendingUserQuestionRef.current.resolve(input);
+        pendingUserQuestionRef.current = null;
         setPendingUserQuestion(null);
         return;
       }
