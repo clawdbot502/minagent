@@ -74,6 +74,22 @@ export function recordMessage(message: Message): void {
   }
 }
 
+function isValidRecord(value: unknown): value is SessionRecord {
+  if (typeof value !== 'object' || value === null) return false;
+  const r = value as Record<string, unknown>;
+  return (
+    typeof r.timestamp === 'string' &&
+    typeof r.role === 'string' &&
+    typeof r.content === 'string' &&
+    (r.toolCalls === undefined || typeof r.toolCalls === 'string') &&
+    (r.toolCallId === undefined || typeof r.toolCallId === 'string')
+  );
+}
+
+function isValidMessageRole(role: string): role is Message['role'] {
+  return ['user', 'assistant', 'system', 'tool'].includes(role);
+}
+
 export function loadTranscript(path?: string): Message[] | null {
   const filePath = path || getTranscriptPath();
   if (!existsSync(filePath)) return null;
@@ -85,16 +101,19 @@ export function loadTranscript(path?: string): Message[] | null {
 
     for (const line of lines) {
       try {
-        const record = JSON.parse(line) as SessionRecord;
+        const parsed = JSON.parse(line);
+        if (!isValidRecord(parsed)) continue;
+        if (!isValidMessageRole(parsed.role)) continue;
+
         const msg: Message = {
-          role: record.role as Message['role'],
-          content: record.content,
+          role: parsed.role,
+          content: parsed.content,
         };
-        if (record.toolCalls) {
-          msg.toolCalls = JSON.parse(record.toolCalls);
+        if (parsed.toolCalls) {
+          msg.toolCalls = JSON.parse(parsed.toolCalls);
         }
-        if (record.toolCallId) {
-          msg.toolCallId = record.toolCallId;
+        if (parsed.toolCallId) {
+          msg.toolCallId = parsed.toolCallId;
         }
         messages.push(msg);
       } catch {
@@ -155,17 +174,36 @@ export function loadSessionState(options: LoadSessionOptions = {}): SessionState
   if (!existsSync(statePath)) return null;
 
   try {
-    const state = JSON.parse(readFileSync(statePath, 'utf-8'));
+    const raw = JSON.parse(readFileSync(statePath, 'utf-8'));
+    if (typeof raw !== 'object' || raw === null) return null;
+
+    const state = raw as Record<string, unknown>;
     const expectedCwd = options.cwd || process.cwd();
-    if (!shouldLoadSessionState(state, expectedCwd, options.allowCrossCwd)) {
+    if (!shouldLoadSessionState(state as { cwd?: string }, expectedCwd, options.allowCrossCwd)) {
       return null;
     }
 
+    if (!Array.isArray(state.messages)) return null;
+
+    const messages: Message[] = [];
+    for (const msg of state.messages) {
+      if (
+        typeof msg === 'object' &&
+        msg !== null &&
+        'role' in msg &&
+        typeof (msg as Message).role === 'string' &&
+        'content' in msg &&
+        typeof (msg as Message).content === 'string'
+      ) {
+        messages.push(msg as Message);
+      }
+    }
+
     return {
-      timestamp: state.timestamp,
-      cwd: state.cwd,
-      messages: state.messages || [],
-      metadata: state.metadata,
+      timestamp: typeof state.timestamp === 'string' ? state.timestamp : undefined,
+      cwd: typeof state.cwd === 'string' ? state.cwd : undefined,
+      messages,
+      metadata: typeof state.metadata === 'object' && state.metadata !== null ? (state.metadata as Record<string, unknown>) : undefined,
     };
   } catch {
     return null;

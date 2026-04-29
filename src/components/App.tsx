@@ -41,7 +41,6 @@ export function App({ config, tools, skills }: AppProps) {
   const agentRef = useRef(new Agent(config, tools, skills, contextManagerRef.current, costTrackerRef.current));
   const commandRegistry = useRef(createCommandRegistry()).current;
   const commandNames = useMemo(() => Array.from(commandRegistry.keys()), [commandRegistry]);
-  const scrollRef = useRef(0);
 
   // Save session on unexpected exit (SIGINT) so /resume can recover it
   useEffect(() => {

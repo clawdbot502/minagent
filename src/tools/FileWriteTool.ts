@@ -3,7 +3,7 @@ import { dirname } from 'path';
 import { z } from 'zod';
 import type { Tool } from './types.js';
 import { globalEditHistory } from './FileEditTool.js';
-import { globalChangeset } from '../utils/changeset.js';
+import { getCurrentChangeset } from '../utils/changeset.js';
 
 export const FileWriteToolSchema = z.object({
   file_path: z.string().describe('Absolute path to the file to write'),
@@ -65,7 +65,7 @@ export const FileWriteTool: Tool<typeof FileWriteToolSchema> = {
           newContent: args.content,
           timestamp: new Date().toISOString(),
         });
-        globalChangeset.record({
+        getCurrentChangeset().record({
           filePath: args.file_path,
           action: 'modified',
           originalContent: oldContent,
@@ -73,7 +73,7 @@ export const FileWriteTool: Tool<typeof FileWriteToolSchema> = {
           timestamp: new Date().toISOString(),
         });
       } else {
-        globalChangeset.record({
+        getCurrentChangeset().record({
           filePath: args.file_path,
           action: 'created',
           originalContent: null,

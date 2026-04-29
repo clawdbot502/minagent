@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from 'async_hooks';
+
 export interface FileChange {
   filePath: string;
   action: 'created' | 'modified' | 'deleted';
@@ -89,4 +91,16 @@ export class ChangesetTracker {
   }
 }
 
+// Fallback global changeset for backward compatibility when not inside an Agent context
 export const globalChangeset = new ChangesetTracker();
+
+// Per-Agent-instance isolation via AsyncLocalStorage
+const changesetStorage = new AsyncLocalStorage<ChangesetTracker>();
+
+export function getCurrentChangeset(): ChangesetTracker {
+  return changesetStorage.getStore() || globalChangeset;
+}
+
+export function runWithChangeset<T>(changeset: ChangesetTracker, fn: () => Promise<T>): Promise<T> {
+  return changesetStorage.run(changeset, fn);
+}
