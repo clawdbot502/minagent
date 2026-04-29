@@ -11,6 +11,7 @@ import { ContextManager } from '../utils/context.js';
 import { CostTracker } from '../utils/costTracker.js';
 import { createCommandRegistry, executeCommand } from '../commands/registry.js';
 import { loadSessionState, saveSessionState } from '../state/session.js';
+import { parseApprovalInput, shouldIgnoreSubmit } from '../utils/approvalInput.js';
 import { readFileSync } from 'fs';
 
 interface AppProps {
@@ -78,18 +79,29 @@ export function App({ config, tools, skills }: AppProps) {
 
   const handleSubmit = useCallback(
     async (input: string) => {
-      if (isProcessing) return;
+      const hasPendingApproval = Boolean(pendingPermission || pendingPlan);
+      if (shouldIgnoreSubmit({ isProcessing, hasPendingApproval })) return;
 
       // Handle permission response
       if (pendingPermission) {
-        const decision = input.toLowerCase().startsWith('y');
+        const decision = parseApprovalInput(input);
+        if (decision === null) {
+          setError('Permission prompt expects y/yes or n/no.');
+          return;
+        }
+        setError(null);
         pendingPermission.resolve(decision);
         setPendingPermission(null);
         return;
       }
 
       if (pendingPlan) {
-        const decision = input.toLowerCase().startsWith('y');
+        const decision = parseApprovalInput(input);
+        if (decision === null) {
+          setError('Plan prompt expects y/yes or n/no.');
+          return;
+        }
+        setError(null);
         pendingPlan.resolve(decision);
         setPendingPlan(null);
         return;
