@@ -12,7 +12,7 @@ interface MessagesProps {
 export function Messages({ messages, toolResults }: MessagesProps) {
   return (
     <Box flexDirection="column" flexGrow={1}>
-      {messages.map((msg, idx) => {
+      {messages.filter((msg) => msg.role === 'user' || msg.role === 'assistant' || msg.role === 'system').map((msg, idx) => {
         if (msg.role === 'user') {
           return (
             <Box key={idx} marginY={1}>
@@ -39,15 +39,12 @@ export function Messages({ messages, toolResults }: MessagesProps) {
           );
         }
 
-        if (msg.role === 'system') {
-          return (
-            <Box key={idx} marginY={1}>
-              <Text dimColor italic>[{msg.content}]</Text>
-            </Box>
-          );
-        }
-
-        return null;
+        // msg.role === 'system'
+        return (
+          <Box key={idx} marginY={1}>
+            <Text dimColor italic>[{msg.content}]</Text>
+          </Box>
+        );
       })}
     </Box>
   );
