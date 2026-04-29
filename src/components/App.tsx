@@ -10,7 +10,7 @@ import { InputBox } from './InputBox.js';
 import { ContextManager } from '../utils/context.js';
 import { CostTracker } from '../utils/costTracker.js';
 import { createCommandRegistry, executeCommand } from '../commands/registry.js';
-import { loadSessionState, saveSessionState } from '../state/session.js';
+import { saveSessionState, archiveSessionState } from '../state/session.js';
 import { parseApprovalInput, shouldIgnoreSubmit } from '../utils/approvalInput.js';
 
 interface AppProps {
@@ -43,16 +43,7 @@ export function App({ config, tools, skills }: AppProps) {
   const commandNames = useMemo(() => Array.from(commandRegistry.keys()), [commandRegistry]);
   const scrollRef = useRef(0);
 
-  // Load previous session
-  useEffect(() => {
-    const state = loadSessionState();
-    if (state?.messages && state.messages.length > 0) {
-      setMessages(state.messages);
-      agentRef.current.setMessages(state.messages);
-    }
-  }, []);
-
-  // Save session on exit
+  // Save session on unexpected exit (SIGINT) so /resume can recover it
   useEffect(() => {
     const handler = () => {
       saveSessionState(agentRef.current.getMessages());
@@ -140,6 +131,7 @@ export function App({ config, tools, skills }: AppProps) {
       // Handle built-in commands
       if (input === '/quit' || input === '/exit') {
         saveSessionState(agentRef.current.getMessages());
+        archiveSessionState();
         exit();
         return;
       }
