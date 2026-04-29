@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'fs';
 import { z } from 'zod';
 import type { Tool } from './types.js';
 import { EditHistory } from '../utils/editHistory.js';
-import { globalChangeset } from '../utils/changeset.js';
+import { getCurrentChangeset } from '../utils/changeset.js';
 
 // Global edit history for undo/redo support
 export const globalEditHistory = new EditHistory();
@@ -118,7 +118,7 @@ export const FileEditTool: Tool<typeof FileEditToolSchema> = {
         newContent,
         timestamp: new Date().toISOString(),
       });
-      globalChangeset.record({
+      getCurrentChangeset().record({
         filePath: args.file_path,
         action: 'modified',
         originalContent: content,

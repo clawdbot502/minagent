@@ -13,7 +13,7 @@ import { DESTRUCTIVE_TOOLS } from '../tools/index.js';
 import { recordMessage } from '../state/session.js';
 import { shouldCompact, compactMessages, estimateTokens } from '../utils/compaction.js';
 import { classifyLLMError } from '../utils/llmErrors.js';
-import { globalChangeset, type ChangesetTracker } from '../utils/changeset.js';
+import { ChangesetTracker, runWithChangeset } from '../utils/changeset.js';
 import { readFileSync } from 'fs';
 import { spawnSync } from 'child_process';
 
@@ -41,6 +41,7 @@ export class Agent {
   private activeSkill: string | null = null;
   private permissionMode: PermissionMode;
   private changeset: ChangesetTracker;
+  private workspaceSummaryCache: string | null = null;
 
   constructor(
     config: Config,
@@ -56,7 +57,8 @@ export class Agent {
     this.costTracker = costTracker;
     this.llm = createLLMClient(config);
     this.permissionMode = (process.env.MINA_PERMISSION_MODE as PermissionMode) || 'default';
-    this.changeset = globalChangeset;
+    this.changeset = new ChangesetTracker();
+    this.workspaceSummaryCache = this.buildWorkspaceSummary();
   }
 
   getMessages(): Message[] {
@@ -177,9 +179,8 @@ Node/Bun version: ${process.version}`;
     }
 
     // Inject workspace summary for context-aware assistance
-    const workspaceSummary = this.buildWorkspaceSummary();
-    if (workspaceSummary) {
-      systemPrompt += '\n\n' + workspaceSummary;
+    if (this.workspaceSummaryCache) {
+      systemPrompt += '\n\n' + this.workspaceSummaryCache;
     }
 
     // Inject git status for code-aware assistance
@@ -311,7 +312,7 @@ Node/Bun version: ${process.version}`;
 
     while (attempt <= MAX_RETRIES) {
       try {
-        await this.runLoop(systemPrompt, callbacks);
+        await runWithChangeset(this.changeset, () => this.runLoop(systemPrompt, callbacks));
         return;
       } catch (err: any) {
         lastError = err;

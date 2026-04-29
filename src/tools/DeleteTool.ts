@@ -1,7 +1,7 @@
 import { rmSync, existsSync, readFileSync } from 'fs';
 import { z } from 'zod';
 import type { Tool } from './types.js';
-import { globalChangeset } from '../utils/changeset.js';
+import { getCurrentChangeset } from '../utils/changeset.js';
 
 export const DeleteToolSchema = z.object({
   file_path: z.string().describe('Absolute path to the file or directory to delete'),
@@ -28,7 +28,7 @@ export const DeleteTool: Tool<typeof DeleteToolSchema> = {
 
       rmSync(args.file_path, { recursive: args.recursive || false });
 
-      globalChangeset.record({
+      getCurrentChangeset().record({
         filePath: args.file_path,
         action: 'deleted',
         originalContent,

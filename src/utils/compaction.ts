@@ -74,18 +74,33 @@ export function compactMessages(
   return [summary, ...preserved];
 }
 
+function estimateTokenCount(text: string): number {
+  let tokens = 0;
+  for (const char of text) {
+    const code = char.charCodeAt(0);
+    // CJK ranges: basic CJK, extension A, Hangul, Hiragana, Katakana
+    const isCJK =
+      (code >= 0x4e00 && code <= 0x9fff) ||
+      (code >= 0x3400 && code <= 0x4dbf) ||
+      (code >= 0xac00 && code <= 0xd7af) ||
+      (code >= 0x3040 && code <= 0x309f) ||
+      (code >= 0x30a0 && code <= 0x30ff);
+    tokens += isCJK ? 1.5 : 0.25;
+  }
+  return Math.ceil(tokens);
+}
+
 export function estimateTokens(messages: Message[]): number {
-  // Rough heuristic: ~4 chars per token
-  let chars = 0;
+  let tokens = 0;
   for (const msg of messages) {
-    chars += msg.content.length;
+    tokens += estimateTokenCount(msg.content);
     if (msg.toolCalls) {
       for (const tc of msg.toolCalls) {
-        chars += tc.name.length + JSON.stringify(tc.arguments).length;
+        tokens += estimateTokenCount(tc.name + JSON.stringify(tc.arguments));
       }
     }
   }
-  return Math.ceil(chars / 4);
+  return tokens;
 }
 
 export function shouldCompact(messages: Message[], config: Config): boolean {
