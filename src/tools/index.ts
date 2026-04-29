@@ -12,6 +12,7 @@ import { AskUserTool } from './AskUserTool.js';
 import { AgentTool } from './AgentTool.js';
 import { TodoTool } from './TodoTool.js';
 import { SleepTool } from './SleepTool.js';
+import { ScheduleTool } from './ScheduleTool.js';
 import { NotebookEditTool } from './NotebookEditTool.js';
 import { LSPTool } from './LSPTool.js';
 import { MCPTool } from './MCPTool.js';
@@ -34,6 +35,7 @@ export const defaultTools: ToolRegistry = {
   [AgentTool.name]: AgentTool,
   [TodoTool.name]: TodoTool,
   [SleepTool.name]: SleepTool,
+  [ScheduleTool.name]: ScheduleTool,
   [NotebookEditTool.name]: NotebookEditTool,
   [LSPTool.name]: LSPTool,
   [MCPTool.name]: MCPTool,
@@ -42,7 +44,7 @@ export const defaultTools: ToolRegistry = {
 };
 
 export const DESTRUCTIVE_TOOLS = new Set([
-  'BashTool', 'FileWriteTool', 'FileEditTool', 'DeleteTool', 'CodeExecuteTool', 'AgentTool', 'NotebookEditTool', 'MCPTool',
+  'BashTool', 'FileWriteTool', 'FileEditTool', 'DeleteTool', 'CodeExecuteTool', 'AgentTool', 'NotebookEditTool', 'MCPTool', 'ScheduleTool',
 ]);
 
 export const READONLY_TOOLS = new Set([
