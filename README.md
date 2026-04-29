@@ -103,6 +103,7 @@ bun start
 | `MINA_PERMISSION_MODE` | Permission mode: `default`, `plan`, `acceptEdits`, `bypassPermissions`, `dontAsk` | No |
 | `MINA_REASONING` | Enable reasoning display (`true`/`false`) | No |
 | `MINA_THEME` | UI theme | No |
+| `MINA_TRUST_LOCAL_SKILLS` | Trust and load repo-local `./skills` modules (`true`/`false`, default `false`) | No |
 
 ---
 

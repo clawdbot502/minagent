@@ -4,9 +4,19 @@ import { render } from 'ink';
 import { loadConfig, validateConfig } from './config.js';
 import { defaultTools } from './tools/index.js';
 import { SkillRegistry } from './skills/registry.js';
-import { loadSkillsFromDir } from './skills/loader.js';
+import { loadSkillsFromDir, type SkillLoadResult } from './skills/loader.js';
 import { App } from './components/App.js';
 import { applyPersistentConfig } from './utils/configStore.js';
+import { existsSync } from 'fs';
+
+function reportSkillLoadIssues(label: string, result: SkillLoadResult): void {
+  for (const duplicate of result.duplicates) {
+    console.warn(`Warning: ${label} skill "${duplicate.name}" replaced an earlier skill (${duplicate.file}).`);
+  }
+  for (const error of result.errors) {
+    console.warn(`Warning: could not load ${label} skill ${error.file}: ${error.message}`);
+  }
+}
 
 async function main() {
   // Apply persistent config before loading so env vars are set
@@ -21,13 +31,21 @@ async function main() {
   }
 
   const skills = new SkillRegistry();
-  const globalCount = await loadSkillsFromDir(config.globalSkillsDir, skills);
-  const localCount = await loadSkillsFromDir(config.localSkillsDir, skills);
+  const globalResult = await loadSkillsFromDir(config.globalSkillsDir, skills);
+  const localResult = config.trustLocalSkills
+    ? await loadSkillsFromDir(config.localSkillsDir, skills)
+    : { loaded: 0, errors: [], duplicates: [] };
 
   console.log('Starting MinAgent...');
   console.log(`Provider: ${config.llmProvider}, Model: ${config.model}`);
-  if (globalCount + localCount > 0) {
-    console.log(`Loaded ${globalCount + localCount} skills.`);
+  reportSkillLoadIssues('global', globalResult);
+  reportSkillLoadIssues('local', localResult);
+  if (!config.trustLocalSkills && existsSync(config.localSkillsDir)) {
+    console.warn('Local skills were not loaded. Set MINA_TRUST_LOCAL_SKILLS=true to trust and load ./skills.');
+  }
+  const totalSkills = globalResult.loaded + localResult.loaded;
+  if (totalSkills > 0) {
+    console.log(`Loaded ${totalSkills} skills.`);
   }
   console.log('Type your message, or /help for commands');
   console.log('---');

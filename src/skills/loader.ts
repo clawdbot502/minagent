@@ -5,10 +5,26 @@ import type { SkillRegistry } from './registry.js';
 
 const SUPPORTED_EXTS = ['.ts', '.js', '.mjs'];
 
-export async function loadSkillsFromDir(dir: string, registry: SkillRegistry): Promise<number> {
-  if (!existsSync(dir)) return 0;
+export interface SkillLoadIssue {
+  file: string;
+  message: string;
+}
 
-  let count = 0;
+export interface SkillDuplicate {
+  name: string;
+  file: string;
+}
+
+export interface SkillLoadResult {
+  loaded: number;
+  errors: SkillLoadIssue[];
+  duplicates: SkillDuplicate[];
+}
+
+export async function loadSkillsFromDir(dir: string, registry: SkillRegistry): Promise<SkillLoadResult> {
+  const result: SkillLoadResult = { loaded: 0, errors: [], duplicates: [] };
+  if (!existsSync(dir)) return result;
+
   const entries = readdirSync(dir, { withFileTypes: true });
 
   for (const entry of entries) {
@@ -22,14 +38,24 @@ export async function loadSkillsFromDir(dir: string, registry: SkillRegistry): P
       if (mod.default && typeof mod.default === 'object') {
         const skill = mod.default as Skill;
         if (skill.name && skill.description && skill.prompt) {
-          registry.register(skill);
-          count++;
+          const previous = registry.register(skill);
+          if (previous) {
+            result.duplicates.push({ name: skill.name, file: fullPath });
+          }
+          result.loaded++;
+        } else {
+          result.errors.push({ file: fullPath, message: 'Missing required name, description, or prompt.' });
         }
+      } else {
+        result.errors.push({ file: fullPath, message: 'Default export must be a skill object.' });
       }
     } catch (err) {
-      // Silently skip broken skill files
+      result.errors.push({
+        file: fullPath,
+        message: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
-  return count;
+  return result;
 }

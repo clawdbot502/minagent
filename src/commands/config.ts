@@ -13,6 +13,7 @@ const CONFIG_KEYS = [
   'MINA_THEME',
   'MINA_SANDBOX',
   'MINA_REASONING',
+  'MINA_TRUST_LOCAL_SKILLS',
 ];
 
 export const configCommand: Command = {
