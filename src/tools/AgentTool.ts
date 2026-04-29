@@ -6,7 +6,7 @@ import type { ToolResult } from '../types.js';
 import type { ToolRegistry } from './types.js';
 
 const SUBAGENT_BLOCKED_ALWAYS = new Set(['AgentTool']);
-const SUBAGENT_DESTRUCTIVE = new Set(['BashTool', 'FileWriteTool', 'FileEditTool', 'DeleteTool', 'CodeExecuteTool']);
+const SUBAGENT_DESTRUCTIVE = new Set(['BashTool', 'FileWriteTool', 'FileEditTool', 'DeleteTool', 'CodeExecuteTool', 'NotebookEditTool', 'MCPTool']);
 
 function canSubAgentUseTool(toolName: string, permissionMode: string): boolean {
   if (SUBAGENT_BLOCKED_ALWAYS.has(toolName)) {
@@ -90,33 +90,37 @@ export const AgentToolSchema = z.object({
   max_iterations: z.number().optional().describe('Maximum tool iterations (default: 10)'),
 });
 
+export function createSubAgentConfig(env: Record<string, string | undefined> = process.env) {
+  const provider = (env.MINA_PROVIDER || 'generic').toLowerCase();
+  return {
+    llmProvider: provider === 'anthropic' ? 'anthropic' as const : 'generic' as const,
+    apiKey: env.MINA_API_KEY || '',
+    baseUrl: env.MINA_BASE_URL || undefined,
+    model: env.MINA_MODEL || '',
+    maxToolIterations: 10,
+    sandbox: true,
+    globalSkillsDir: '',
+    localSkillsDir: '',
+    contextWindow: parseInt(env.MINA_CONTEXT_WINDOW || '128000', 10),
+    trustLocalSkills: false,
+  };
+}
+
 export const AgentTool: Tool<typeof AgentToolSchema> = {
   name: 'AgentTool',
   description: 'Spawn a sub-agent to handle a specific task independently. Useful for parallel work or focused investigations. In safe permission modes, sub-agents are restricted to non-destructive tools.',
   schema: AgentToolSchema,
   async execute(args) {
-    const provider = (process.env.MINA_PROVIDER || 'generic').toLowerCase();
-    const apiKey = process.env.MINA_API_KEY || '';
-    const model = process.env.MINA_MODEL || '';
+    const config = createSubAgentConfig();
 
-    if (!apiKey) {
+    if (!config.apiKey) {
       return 'Error: MINA_API_KEY not set for sub-agent';
     }
-    if (!model) {
+    if (!config.model) {
       return 'Error: MINA_MODEL not set for sub-agent';
     }
 
-    const config = {
-      llmProvider: provider === 'anthropic' ? 'anthropic' as const : 'generic' as const,
-      apiKey,
-      model,
-      maxToolIterations: args.max_iterations || 10,
-      sandbox: true,
-      globalSkillsDir: '',
-      localSkillsDir: '',
-      contextWindow: parseInt(process.env.MINA_CONTEXT_WINDOW || '128000', 10),
-      trustLocalSkills: false,
-    };
+    config.maxToolIterations = args.max_iterations || 10;
     const llm = createLLMClient(config);
     const { defaultTools } = await import('./index.js');
     const tools = defaultTools;

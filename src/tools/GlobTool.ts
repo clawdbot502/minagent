@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { z } from 'zod';
 import type { Tool } from './types.js';
 
@@ -15,43 +15,26 @@ export const GlobTool: Tool<typeof GlobToolSchema> = {
   schema: GlobToolSchema,
   async execute(args) {
     try {
-      const cmdParts = ['find'];
-      cmdParts.push(args.path || '.');
-      cmdParts.push('-type', 'f');
-
-      // Use find with -name for simple patterns, or fallback to fd if available
       const limit = args.limit || 100;
-
-      let result: string;
-      try {
-        // Try fd first (faster, glob support)
-        const fdCmd = ['fd', '--type', 'f', '--max-results', String(limit)];
-        if (args.exclude) {
-          fdCmd.push('--exclude', args.exclude);
-        }
-        fdCmd.push(args.pattern);
-        if (args.path) fdCmd.push(args.path);
-
-        result = execSync(fdCmd.join(' '), {
-          encoding: 'utf-8',
-          maxBuffer: 5 * 1024 * 1024,
-          timeout: 15000,
-        });
-      } catch {
-        // Fallback to find
-        const findCmd = ['find', args.path || '.', '-type', 'f'];
-        const findResult = execSync(findCmd.join(' '), {
-          encoding: 'utf-8',
-          maxBuffer: 5 * 1024 * 1024,
-          timeout: 30000,
-        });
-
-        const lines = findResult.split('\n').filter((l) => l.trim());
-        // Simple glob matching
-        const regex = globToRegex(args.pattern);
-        const filtered = lines.filter((l) => regex.test(l));
-        result = filtered.slice(0, limit).join('\n');
+      const findResult = spawnSync('find', [args.path || '.', '-type', 'f'], {
+        encoding: 'utf-8',
+        maxBuffer: 5 * 1024 * 1024,
+        timeout: 30000,
+      });
+      if (findResult.error) return `Error: ${findResult.error.message}`;
+      if (findResult.status !== 0) {
+        return `Error: ${findResult.stderr || `find exited with code ${findResult.status}`}`;
       }
+
+      const regex = globToRegex(args.pattern);
+      const excluded = args.exclude ? globToRegex(args.exclude) : null;
+      const result = (findResult.stdout || '')
+        .split('\n')
+        .filter((l) => l.trim())
+        .filter((l) => regex.test(l))
+        .filter((l) => !excluded?.test(l))
+        .slice(0, limit)
+        .join('\n');
 
       const lines = result.split('\n').filter((l) => l.trim());
       if (lines.length === 0) return '(no files found)';
@@ -66,10 +49,19 @@ export const GlobTool: Tool<typeof GlobToolSchema> = {
 };
 
 function globToRegex(pattern: string): RegExp {
-  let regex = pattern
-    .replace(/\*\*/g, '<<<DOUBLESTAR>>>')
-    .replace(/\*/g, '[^/]*')
-    .replace(/<<<DOUBLESTAR>>>/g, '.*')
-    .replace(/\?/g, '[^/]');
+  let regex = '';
+  for (let i = 0; i < pattern.length; i++) {
+    const char = pattern[i]!;
+    if (char === '*' && pattern[i + 1] === '*') {
+      regex += '.*';
+      i++;
+    } else if (char === '*') {
+      regex += '[^/]*';
+    } else if (char === '?') {
+      regex += '[^/]';
+    } else {
+      regex += char.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    }
+  }
   return new RegExp(regex);
 }

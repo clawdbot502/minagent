@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { z } from 'zod';
 import type { Config, LLMProvider } from '../config.js';
 import type { Message, ToolCall } from '../types.js';
 import type { ToolRegistry } from '../tools/types.js';
@@ -23,6 +23,49 @@ export interface LLMClient {
     tools: ToolRegistry,
     systemPrompt?: string
   ): AsyncGenerator<LLMStreamChunk>;
+}
+
+export function toolSchemaToJsonSchema(schema: z.ZodType): Record<string, any> {
+  const { $schema, ...jsonSchema } = z.toJSONSchema(schema) as Record<string, any>;
+  return jsonSchema;
+}
+
+export function messagesToAnthropicMessages(messages: Message[]): Anthropic.MessageParam[] {
+  const anthropicMessages: Anthropic.MessageParam[] = [];
+
+  for (const msg of messages) {
+    if (msg.role === 'tool') {
+      anthropicMessages.push({
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: msg.toolCallId || '',
+            content: msg.content,
+          },
+        ],
+      });
+    } else if (msg.role === 'assistant' && msg.toolCalls) {
+      anthropicMessages.push({
+        role: 'assistant',
+        content: [
+          ...(msg.content ? [{ type: 'text' as const, text: msg.content }] : []),
+          ...msg.toolCalls.map((tc) => ({
+            type: 'tool_use' as const,
+            id: tc.id,
+            name: tc.name,
+            input: tc.arguments,
+          })),
+        ],
+      });
+    } else if (msg.role === 'user') {
+      anthropicMessages.push({ role: 'user', content: msg.content });
+    } else if (msg.role === 'assistant') {
+      anthropicMessages.push({ role: 'assistant', content: msg.content });
+    }
+  }
+
+  return anthropicMessages;
 }
 
 /**
@@ -63,7 +106,7 @@ class GenericClient implements LLMClient {
       function: {
         name: tool.name,
         description: tool.description,
-        parameters: zodToJsonSchema(tool.schema as any, { target: 'openApi3' }),
+        parameters: toolSchemaToJsonSchema(tool.schema),
       },
     }));
   }
@@ -191,7 +234,7 @@ class AnthropicClient implements LLMClient {
     return Object.values(tools).map((tool) => ({
       name: tool.name,
       description: tool.description,
-      input_schema: zodToJsonSchema(tool.schema as any, { target: 'openApi3' }) as Anthropic.Tool.InputSchema,
+      input_schema: toolSchemaToJsonSchema(tool.schema) as Anthropic.Tool.InputSchema,
     }));
   }
 
@@ -200,39 +243,7 @@ class AnthropicClient implements LLMClient {
     tools: ToolRegistry,
     systemPrompt?: string
   ): AsyncGenerator<LLMStreamChunk> {
-    const anthropicMessages: Anthropic.MessageParam[] = [];
-
-    for (const msg of messages) {
-      if (msg.role === 'tool') {
-        anthropicMessages.push({
-          role: 'user',
-          content: [
-            {
-              type: 'tool_result',
-              tool_use_id: msg.toolCallId || '',
-              content: msg.content,
-            },
-          ],
-        });
-      } else if (msg.role === 'assistant' && msg.toolCalls) {
-        anthropicMessages.push({
-          role: 'assistant',
-          content: [
-            { type: 'text', text: msg.content },
-            ...msg.toolCalls.map((tc) => ({
-              type: 'tool_use' as const,
-              id: tc.id,
-              name: tc.name,
-              input: tc.arguments,
-            })),
-          ],
-        });
-      } else if (msg.role === 'user') {
-        anthropicMessages.push({ role: 'user', content: msg.content });
-      } else if (msg.role === 'assistant') {
-        anthropicMessages.push({ role: 'assistant', content: msg.content });
-      }
-    }
+    const anthropicMessages = messagesToAnthropicMessages(messages);
 
     const toolDefs = this.buildTools(tools);
     const thinkingEnabled = process.env.MINA_REASONING === 'true';

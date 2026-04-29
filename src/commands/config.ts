@@ -1,5 +1,5 @@
 import type { Command } from './types.js';
-import { loadPersistentConfig, savePersistentConfig, setPersistentConfig } from '../utils/configStore.js';
+import { loadPersistentConfig, setPersistentConfig } from '../utils/configStore.js';
 
 const CONFIG_KEYS = [
   'MINA_PROVIDER',
@@ -19,7 +19,7 @@ const CONFIG_KEYS = [
 export const configCommand: Command = {
   name: 'config',
   description: 'Show or set configuration values',
-  execute: async (args) => {
+  execute: async (args, ctx) => {
     const parts = args.trim().split(/\s+/);
 
     // Show all
@@ -49,6 +49,7 @@ export const configCommand: Command = {
       }
       process.env[key] = value;
       setPersistentConfig(key, value);
+      ctx.agent.reloadConfig();
       return `Set and persisted ${key}=${key === 'MINA_API_KEY' ? value.slice(0, 4) + '...' : value}`;
     }
 
