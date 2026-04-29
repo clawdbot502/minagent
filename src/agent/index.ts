@@ -1,5 +1,6 @@
 import type { Message, ToolCall, ToolResult } from '../types.js';
 import type { Config } from '../config.js';
+import type { PermissionMode } from '../utils/permissions.js';
 import type { ToolRegistry } from '../tools/types.js';
 import type { SkillRegistry } from '../skills/registry.js';
 import type { ContextManager } from '../utils/context.js';
@@ -22,6 +23,7 @@ export interface AgentCallbacks {
   onToolResults: (results: ToolResult[]) => void;
   onPermissionRequest: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
   onPlanRequest?: (calls: ToolCall[]) => Promise<boolean>;
+  onUserQuestion?: (question: string, options?: string[]) => Promise<string>;
   onComplete: () => void;
   onError: (err: string) => void;
   onCompaction?: (summary: string) => void;
@@ -36,7 +38,7 @@ export class Agent {
   private costTracker: CostTracker;
   private llm: ReturnType<typeof createLLMClient>;
   private activeSkill: string | null = null;
-  private permissionMode: string;
+  private permissionMode: PermissionMode;
   private changeset: ChangesetTracker;
 
   constructor(
@@ -52,7 +54,7 @@ export class Agent {
     this.contextManager = contextManager;
     this.costTracker = costTracker;
     this.llm = createLLMClient(config);
-    this.permissionMode = process.env.MINA_PERMISSION_MODE || 'default';
+    this.permissionMode = (process.env.MINA_PERMISSION_MODE as PermissionMode) || 'default';
     this.changeset = new ChangesetTracker();
   }
 
@@ -70,6 +72,19 @@ export class Agent {
 
   getActiveSkill(): string | null {
     return this.activeSkill;
+  }
+
+  setPermissionMode(mode: PermissionMode): void {
+    this.permissionMode = mode;
+    process.env.MINA_PERMISSION_MODE = mode;
+  }
+
+  getPermissionMode(): PermissionMode {
+    return this.permissionMode;
+  }
+
+  getContextFilePaths(): string[] {
+    return this.contextManager.list().map((f) => f.path);
   }
 
   getCostSummary(): string {
@@ -368,20 +383,45 @@ Node/Bun version: ${process.version}`;
 
       callbacks.onToolCalls(assistantToolCalls);
 
+      // Interactive user questions are handled by the host UI instead of
+      // returning a placeholder string and letting the model continue.
+      const interactiveResults: ToolResult[] = [];
+      const remainingToolCalls: ToolCall[] = [];
+
+      for (const tc of assistantToolCalls) {
+        if (tc.name === 'AskUserTool' && callbacks.onUserQuestion) {
+          const question = typeof tc.arguments.question === 'string'
+            ? tc.arguments.question
+            : 'The agent needs your input.';
+          const options = Array.isArray(tc.arguments.options)
+            ? tc.arguments.options.filter((option): option is string => typeof option === 'string')
+            : undefined;
+          const answer = await callbacks.onUserQuestion(question, options);
+          interactiveResults.push({
+            toolCallId: tc.id,
+            name: tc.name,
+            output: answer,
+            error: false,
+          });
+        } else {
+          remainingToolCalls.push(tc);
+        }
+      }
+
       // Permission checks
       const approvedCalls: ToolCall[] = [];
       const deniedCalls: ToolCall[] = [];
 
-      if (this.permissionMode === 'plan' && callbacks.onPlanRequest) {
+      if (this.permissionMode === 'plan' && remainingToolCalls.length > 0 && callbacks.onPlanRequest) {
         // Plan mode: ask for entire batch at once
-        const planApproved = await callbacks.onPlanRequest(assistantToolCalls);
+        const planApproved = await callbacks.onPlanRequest(remainingToolCalls);
         if (planApproved) {
-          approvedCalls.push(...assistantToolCalls);
+          approvedCalls.push(...remainingToolCalls);
         } else {
-          deniedCalls.push(...assistantToolCalls);
+          deniedCalls.push(...remainingToolCalls);
         }
       } else {
-        for (const tc of assistantToolCalls) {
+        for (const tc of remainingToolCalls) {
           const isDestructive = DESTRUCTIVE_TOOLS.has(tc.name);
           if (shouldAskPermission(tc.name, { mode: this.permissionMode as any, rules: [] }, isDestructive)) {
             const approved = await callbacks.onPermissionRequest(tc.name, tc.arguments);
@@ -397,9 +437,9 @@ Node/Bun version: ${process.version}`;
       }
 
       // Execute approved tools
-      let results: ToolResult[] = [];
+      let results: ToolResult[] = [...interactiveResults];
       if (approvedCalls.length > 0) {
-        results = await executeToolCalls(approvedCalls, this.tools);
+        results.push(...await executeToolCalls(approvedCalls, this.tools));
       }
 
       // Add denied results

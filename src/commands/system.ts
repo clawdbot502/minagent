@@ -34,8 +34,8 @@ export const modelCommand: Command = {
 export const permissionsCommand: Command = {
   name: 'permissions',
   description: 'Show current permission mode',
-  execute: async (_args) => {
-    const mode = process.env.MINA_PERMISSION_MODE || 'default';
+  execute: async (_args, ctx) => {
+    const mode = ctx.agent.getPermissionMode();
     return `Current permission mode: ${mode}\n` +
            'Modes: default | plan | acceptEdits | bypassPermissions | dontAsk\n' +
            'Set via MINA_PERMISSION_MODE env var.';

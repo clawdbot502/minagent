@@ -2,6 +2,7 @@ import { Box, Text } from 'ink';
 import type { Message, ToolCall, ToolResult } from '../types.js';
 import { ToolCallDisplay } from './ToolCall.js';
 import { MarkdownText } from './MarkdownText.js';
+import { getToolResultsKey } from '../utils/toolResults.js';
 
 interface MessagesProps {
   messages: Message[];
@@ -22,6 +23,8 @@ export function Messages({ messages, toolResults }: MessagesProps) {
         }
 
         if (msg.role === 'assistant') {
+          const toolResultsKey = getToolResultsKey(msg.toolCalls);
+
           return (
             <Box key={idx} flexDirection="column" marginY={1}>
               <Text bold color="magenta">Agent: </Text>
@@ -29,7 +32,7 @@ export function Messages({ messages, toolResults }: MessagesProps) {
               {msg.toolCalls && (
                 <ToolCallDisplay
                   calls={msg.toolCalls}
-                  results={msg.toolCallId ? toolResults.get(msg.toolCallId) : undefined}
+                  results={toolResultsKey ? toolResults.get(toolResultsKey) : undefined}
                 />
               )}
             </Box>
