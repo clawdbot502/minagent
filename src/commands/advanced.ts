@@ -18,8 +18,8 @@ export const compactCommand: Command = {
 export const planCommand: Command = {
   name: 'plan',
   description: 'Enter plan mode (ask before executing tools)',
-  execute: async (_args) => {
-    process.env.MINA_PERMISSION_MODE = 'plan';
+  execute: async (_args, ctx) => {
+    ctx.agent.setPermissionMode('plan');
     return 'Entered plan mode. All tool calls will require confirmation.';
   },
 };
@@ -27,8 +27,8 @@ export const planCommand: Command = {
 export const actCommand: Command = {
   name: 'act',
   description: 'Exit plan mode and enter act mode',
-  execute: async (_args) => {
-    process.env.MINA_PERMISSION_MODE = 'default';
+  execute: async (_args, ctx) => {
+    ctx.agent.setPermissionMode('default');
     return 'Entered act mode (default). Destructive tools will be confirmed.';
   },
 };

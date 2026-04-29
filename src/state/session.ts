@@ -11,6 +11,26 @@ export interface SessionRecord {
   toolCallId?: string;
 }
 
+export interface SessionState {
+  timestamp?: string;
+  cwd?: string;
+  messages: Message[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface LoadSessionOptions {
+  cwd?: string;
+  allowCrossCwd?: boolean;
+}
+
+export function shouldLoadSessionState(
+  state: { cwd?: string },
+  cwd: string,
+  allowCrossCwd = false
+): boolean {
+  return allowCrossCwd || !state.cwd || state.cwd === cwd;
+}
+
 export function getSessionDir(): string {
   const baseDir = join(homedir(), '.minagent');
   if (!existsSync(baseDir)) mkdirSync(baseDir, { recursive: true, mode: 0o700 });
@@ -105,13 +125,23 @@ export function saveSessionState(messages: Message[], metadata?: Record<string, 
   }
 }
 
-export function loadSessionState(): { messages: Message[]; metadata?: Record<string, unknown> } | null {
+export function loadSessionState(options: LoadSessionOptions = {}): SessionState | null {
   const statePath = join(getSessionDir(), 'last-state.json');
   if (!existsSync(statePath)) return null;
 
   try {
     const state = JSON.parse(readFileSync(statePath, 'utf-8'));
-    return { messages: state.messages || [], metadata: state.metadata };
+    const expectedCwd = options.cwd || process.cwd();
+    if (!shouldLoadSessionState(state, expectedCwd, options.allowCrossCwd)) {
+      return null;
+    }
+
+    return {
+      timestamp: state.timestamp,
+      cwd: state.cwd,
+      messages: state.messages || [],
+      metadata: state.metadata,
+    };
   } catch {
     return null;
   }

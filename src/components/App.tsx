@@ -12,7 +12,6 @@ import { CostTracker } from '../utils/costTracker.js';
 import { createCommandRegistry, executeCommand } from '../commands/registry.js';
 import { loadSessionState, saveSessionState } from '../state/session.js';
 import { parseApprovalInput, shouldIgnoreSubmit } from '../utils/approvalInput.js';
-import { readFileSync } from 'fs';
 
 interface AppProps {
   config: Config;
@@ -30,6 +29,7 @@ export function App({ config, tools, skills }: AppProps) {
   const [error, setError] = useState<string | null>(null);
   const [pendingPermission, setPendingPermission] = useState<{ toolName: string; args: Record<string, unknown>; resolve: (v: boolean) => void } | null>(null);
   const [pendingPlan, setPendingPlan] = useState<{ calls: ToolCall[]; resolve: (v: boolean) => void } | null>(null);
+  const [pendingUserQuestion, setPendingUserQuestion] = useState<{ question: string; options?: string[]; resolve: (v: string) => void } | null>(null);
   const [contextFiles, setContextFiles] = useState<string[]>([]);
   const toolResultsRef = useRef(new Map<string, ToolResult[]>());
   const contextManagerRef = useRef(new ContextManager());
@@ -65,6 +65,12 @@ export function App({ config, tools, skills }: AppProps) {
     agentRef.current.setActiveSkill(activeSkill);
   }, [activeSkill]);
 
+  const syncFromAgent = useCallback((extraMessage?: Message) => {
+    const nextMessages = agentRef.current.getMessages();
+    setMessages(extraMessage ? [...nextMessages, extraMessage] : [...nextMessages]);
+    setContextFiles(agentRef.current.getContextFilePaths());
+  }, []);
+
   const handlePermission = useCallback(async (toolName: string, args: Record<string, unknown>): Promise<boolean> => {
     return new Promise((resolve) => {
       setPendingPermission({ toolName, args, resolve });
@@ -77,9 +83,15 @@ export function App({ config, tools, skills }: AppProps) {
     });
   }, []);
 
+  const handleUserQuestion = useCallback(async (question: string, options?: string[]): Promise<string> => {
+    return new Promise((resolve) => {
+      setPendingUserQuestion({ question, options, resolve });
+    });
+  }, []);
+
   const handleSubmit = useCallback(
     async (input: string) => {
-      const hasPendingApproval = Boolean(pendingPermission || pendingPlan);
+      const hasPendingApproval = Boolean(pendingPermission || pendingPlan || pendingUserQuestion);
       if (shouldIgnoreSubmit({ isProcessing, hasPendingApproval })) return;
 
       // Handle permission response
@@ -107,6 +119,13 @@ export function App({ config, tools, skills }: AppProps) {
         return;
       }
 
+      if (pendingUserQuestion) {
+        setError(null);
+        pendingUserQuestion.resolve(input);
+        setPendingUserQuestion(null);
+        return;
+      }
+
       // Handle built-in commands
       if (input === '/quit' || input === '/exit') {
         saveSessionState(agentRef.current.getMessages());
@@ -124,7 +143,7 @@ export function App({ config, tools, skills }: AppProps) {
         const result = await executeCommand(input, commandRegistry, ctx);
         if (result !== null) {
           const systemMsg: Message = { role: 'assistant', content: result };
-          setMessages((prev) => [...prev, systemMsg]);
+          syncFromAgent(systemMsg);
           return;
         }
 
@@ -136,55 +155,9 @@ export function App({ config, tools, skills }: AppProps) {
             role: 'assistant',
             content: `Switched to skill: ${skillName}`,
           };
-          setMessages((prev) => [...prev, systemMsg]);
+          syncFromAgent(systemMsg);
           return;
         }
-      }
-
-      // Handle /add and /drop manually (need context manager)
-      if (input.startsWith('/add ')) {
-        const path = input.slice(5).trim();
-        try {
-          const content = readFileSync(path, 'utf-8');
-          contextManagerRef.current.add({ path, content });
-          setContextFiles(Array.from(contextManagerRef.current.list().map((f) => f.path)));
-          const systemMsg: Message = {
-            role: 'assistant',
-            content: `Added ${path} to context (${content.length} chars).`,
-          };
-          setMessages((prev) => [...prev, systemMsg]);
-        } catch (err: any) {
-          const systemMsg: Message = {
-            role: 'assistant',
-            content: `Error adding ${path}: ${err.message}`,
-          };
-          setMessages((prev) => [...prev, systemMsg]);
-        }
-        return;
-      }
-
-      if (input.startsWith('/drop ')) {
-        const path = input.slice(6).trim();
-        contextManagerRef.current.remove(path);
-        setContextFiles(Array.from(contextManagerRef.current.list().map((f) => f.path)));
-        const systemMsg: Message = {
-          role: 'assistant',
-          content: `Dropped ${path} from context.`,
-        };
-        setMessages((prev) => [...prev, systemMsg]);
-        return;
-      }
-
-      if (input === '/context') {
-        const files = contextManagerRef.current.list();
-        const systemMsg: Message = {
-          role: 'assistant',
-          content: files.length === 0
-            ? 'No files in context.'
-            : `Context files:\n${files.map((f) => `  ${f.path} (${f.content.length} chars)`).join('\n')}`,
-        };
-        setMessages((prev) => [...prev, systemMsg]);
-        return;
       }
 
       setError(null);
@@ -223,6 +196,7 @@ export function App({ config, tools, skills }: AppProps) {
         },
         onPermissionRequest: handlePermission,
         onPlanRequest: handlePlan,
+        onUserQuestion: handleUserQuestion,
         onComplete: () => {
           setMessages((prev) => {
             const last = prev[prev.length - 1];
@@ -246,7 +220,7 @@ export function App({ config, tools, skills }: AppProps) {
 
       setIsProcessing(false);
     },
-    [isProcessing, pendingPermission, pendingPlan, skills, tools, commandRegistry, exit, handlePermission, handlePlan]
+    [isProcessing, pendingPermission, pendingPlan, pendingUserQuestion, skills, tools, commandRegistry, exit, handlePermission, handlePlan, handleUserQuestion, syncFromAgent]
   );
 
   return (
@@ -289,10 +263,20 @@ export function App({ config, tools, skills }: AppProps) {
         </Box>
       )}
 
+      {pendingUserQuestion && (
+        <Box marginY={1} borderStyle="single" borderColor="cyan" paddingX={1} flexDirection="column">
+          <Text bold color="cyan">Agent needs input</Text>
+          <Text>{pendingUserQuestion.question}</Text>
+          {pendingUserQuestion.options && pendingUserQuestion.options.length > 0 && (
+            <Text dimColor>Options: {pendingUserQuestion.options.join(', ')}</Text>
+          )}
+        </Box>
+      )}
+
       {/* Messages */}
       <Box flexDirection="column" flexGrow={1} overflow="hidden">
         <Messages messages={messages} toolResults={toolResultsRef.current} />
-        {isProcessing && !pendingPermission && (
+        {isProcessing && !pendingPermission && !pendingPlan && !pendingUserQuestion && (
           <Box flexDirection="column" marginY={1}>
             {currentReasoning && (
               <Box marginBottom={1}>
@@ -309,7 +293,7 @@ export function App({ config, tools, skills }: AppProps) {
       {/* Input */}
       <InputBox
         onSubmit={handleSubmit}
-        disabled={isProcessing && !pendingPermission && !pendingPlan}
+        disabled={isProcessing && !pendingPermission && !pendingPlan && !pendingUserQuestion}
         activeSkill={activeSkill}
         commands={commandNames}
       />
