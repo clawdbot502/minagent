@@ -115,6 +115,7 @@ export const AgentTool: Tool<typeof AgentToolSchema> = {
       globalSkillsDir: '',
       localSkillsDir: '',
       contextWindow: parseInt(process.env.MINA_CONTEXT_WINDOW || '128000', 10),
+      trustLocalSkills: false,
     };
     const llm = createLLMClient(config);
     const { defaultTools } = await import('./index.js');

@@ -69,6 +69,7 @@ export function App({ config, tools, skills }: AppProps) {
     const nextMessages = agentRef.current.getMessages();
     setMessages(extraMessage ? [...nextMessages, extraMessage] : [...nextMessages]);
     setContextFiles(agentRef.current.getContextFilePaths());
+    setActiveSkill(agentRef.current.getActiveSkill());
   }, []);
 
   const handlePermission = useCallback(async (toolName: string, args: Record<string, unknown>): Promise<boolean> => {
@@ -150,6 +151,7 @@ export function App({ config, tools, skills }: AppProps) {
         // Check for skill switch
         const skillName = input.slice(1).trim();
         if (skills.has(skillName)) {
+          agentRef.current.setActiveSkill(skillName);
           setActiveSkill(skillName);
           const systemMsg: Message = {
             role: 'assistant',

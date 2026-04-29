@@ -3,8 +3,10 @@ import type { Skill } from './types.js';
 export class SkillRegistry {
   private skills = new Map<string, Skill>();
 
-  register(skill: Skill): void {
+  register(skill: Skill): Skill | null {
+    const previous = this.skills.get(skill.name) || null;
     this.skills.set(skill.name, skill);
+    return previous;
   }
 
   get(name: string): Skill | undefined {

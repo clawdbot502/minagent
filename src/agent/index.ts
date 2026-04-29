@@ -5,6 +5,7 @@ import type { ToolRegistry } from '../tools/types.js';
 import type { SkillRegistry } from '../skills/registry.js';
 import type { ContextManager } from '../utils/context.js';
 import type { CostTracker } from '../utils/costTracker.js';
+import { filterToolsForSkill } from '../skills/toolFilter.js';
 import { createLLMClient } from './llm.js';
 import { executeToolCalls } from './toolExecutor.js';
 import { shouldAskPermission } from '../utils/permissions.js';
@@ -85,6 +86,11 @@ export class Agent {
 
   getContextFilePaths(): string[] {
     return this.contextManager.list().map((f) => f.path);
+  }
+
+  private getActiveTools(): ToolRegistry {
+    const skill = this.activeSkill ? this.skills.get(this.activeSkill) : undefined;
+    return filterToolsForSkill(this.tools, skill);
   }
 
   getCostSummary(): string {
@@ -343,7 +349,8 @@ Node/Bun version: ${process.version}`;
     while (iteration < this.config.maxToolIterations) {
       iteration++;
 
-      const stream = this.llm.stream(this.messages, this.tools, systemPrompt);
+      const activeTools = this.getActiveTools();
+      const stream = this.llm.stream(this.messages, activeTools, systemPrompt);
       let assistantContent = '';
       let assistantToolCalls: ToolCall[] | undefined;
 
@@ -439,7 +446,7 @@ Node/Bun version: ${process.version}`;
       // Execute approved tools
       let results: ToolResult[] = [...interactiveResults];
       if (approvedCalls.length > 0) {
-        results.push(...await executeToolCalls(approvedCalls, this.tools));
+        results.push(...await executeToolCalls(approvedCalls, activeTools));
       }
 
       // Add denied results

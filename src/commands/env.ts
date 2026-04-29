@@ -16,6 +16,7 @@ export const envCommand: Command = {
       'MINA_THEME',
       'MINA_SANDBOX',
       'MINA_REASONING',
+      'MINA_TRUST_LOCAL_SKILLS',
       'PATH',
       'HOME',
       'SHELL',

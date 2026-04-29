@@ -13,6 +13,7 @@ export interface Config {
   maxToolIterations: number;
   sandbox: boolean;
   contextWindow: number;
+  trustLocalSkills: boolean;
 }
 
 function getEnv(key: string): string | undefined {
@@ -52,6 +53,7 @@ export function loadConfig(): Config {
     maxToolIterations: 25,
     sandbox: getEnv('MINA_SANDBOX') !== 'false',
     contextWindow,
+    trustLocalSkills: getEnv('MINA_TRUST_LOCAL_SKILLS') === 'true',
   };
 }
 

@@ -69,6 +69,7 @@ export const doctorCommand: Command = {
     // Theme
     const theme = process.env.MINA_THEME || 'default';
     lines.push(`  Theme:    ${theme}`);
+    lines.push(`  Local skills: ${process.env.MINA_TRUST_LOCAL_SKILLS === 'true' ? 'trusted' : 'not trusted'}`);
 
     lines.push('');
     const allOk = (bun.ok || node.ok) && git.ok && hasKey && model !== '(not set)' && rg.ok;
