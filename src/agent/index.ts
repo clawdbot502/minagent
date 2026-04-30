@@ -168,7 +168,7 @@ Node/Bun version: ${process.version}`;
     if (this.activeSkill) {
       const skillPrompt = this.skills.getSystemPrompt(this.activeSkill);
       if (skillPrompt) {
-        systemPrompt = skillPrompt + `\n\nCurrent working directory: ${process.cwd()}`;
+        systemPrompt += '\n\n' + skillPrompt;
       }
     }
 
