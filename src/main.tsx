@@ -8,6 +8,7 @@ import { loadSkillsFromDir, type SkillLoadResult } from './skills/loader.js';
 import { App } from './components/App.js';
 import { applyPersistentConfig } from './utils/configStore.js';
 import { existsSync } from 'fs';
+import { runCurator } from './skills-v2/curator.js';
 
 function reportSkillLoadIssues(label: string, result: SkillLoadResult): void {
   for (const duplicate of result.duplicates) {
@@ -47,6 +48,16 @@ async function main() {
   if (totalSkills > 0) {
     console.log(`Loaded ${totalSkills} skills.`);
   }
+  // Background curator: run on startup if interval elapsed
+  try {
+    const curatorResult = runCurator();
+    if (curatorResult.reviewed > 0) {
+      console.log(`[Curator] Reviewed ${curatorResult.reviewed} skills, transitioned ${curatorResult.transitioned} to stale, archived ${curatorResult.archived}.`);
+    }
+  } catch {
+    // ignore curator errors on startup
+  }
+
   console.log('Type your message, or /help for commands');
   console.log('---');
 

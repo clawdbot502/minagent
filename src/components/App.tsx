@@ -30,6 +30,7 @@ export function App({ config, tools, skills }: AppProps) {
   const [currentStream, setCurrentStream] = useState('');
   const [currentReasoning, setCurrentReasoning] = useState('');
   const [activeSkill, setActiveSkill] = useState<string | null>(null);
+  const [v2ActiveSkills, setV2ActiveSkills] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const pendingPermissionRef = useRef<{ resolve: (v: boolean) => void } | null>(null);
   const pendingPlanRef = useRef<{ resolve: (v: boolean) => void } | null>(null);
@@ -68,6 +69,7 @@ export function App({ config, tools, skills }: AppProps) {
     setMessages(extraMessage ? [...nextMessages, extraMessage] : [...nextMessages]);
     setContextFiles(agentRef.current.getContextFilePaths());
     setActiveSkill(agentRef.current.getActiveSkill());
+    setV2ActiveSkills(skillScopeManager.getActiveSkillNames());
   }, []);
 
   const handlePermission = useCallback(async (toolName: string, args: Record<string, unknown>): Promise<boolean> => {
@@ -322,7 +324,7 @@ export function App({ config, tools, skills }: AppProps) {
       <Box paddingY={1}>
         <Text dimColor>
           MinAgent | {config.model} | {contextFiles.length > 0 ? `${contextFiles.length} ctx files | ` : ''}
-          {activeSkill ? `[${activeSkill}]` : 'default mode'}
+          {activeSkill ? `[${activeSkill}]` : v2ActiveSkills.length > 0 ? `[${v2ActiveSkills.join(', ')}]` : 'default mode'}
         </Text>
       </Box>
 
