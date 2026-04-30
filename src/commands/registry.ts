@@ -11,7 +11,7 @@ import {
   gitStashPopCommand, gitStashListCommand,
 } from './git-extended.js';
 import {
-  clearCommand, skillsCommand, modelCommand,
+  clearCommand, skillsCommand, defaultCommand, modelCommand,
   permissionsCommand, costCommand, helpCommand,
 } from './system.js';
 import { doctorCommand } from './doctor.js';
@@ -46,7 +46,7 @@ export function createCommandRegistry(): CommandRegistry {
     gitTagCommand, gitRemoteCommand, gitPullCommand, gitShowCommand,
     gitCherryPickCommand, gitBlameCommand, gitBisectCommand,
     gitStashPopCommand, gitStashListCommand,
-    clearCommand, skillsCommand, modelCommand,
+    clearCommand, skillsCommand, defaultCommand, modelCommand,
     permissionsCommand, costCommand, helpCommand,
     doctorCommand, configCommand, mcpCommand,
     compactCommand, planCommand, actCommand, resumeCommand,

@@ -1,21 +1,57 @@
 import type { Command } from './types.js';
+import { skillScopeManager } from '../skills-v2/scope.js';
+import { getSkillIndex } from '../skills-v2/discovery.js';
 
 export const clearCommand: Command = {
   name: 'clear',
   description: 'Clear conversation history',
   execute: async (_args, ctx) => {
     ctx.agent.clear();
+    skillScopeManager.exitAll('clear');
     return 'Conversation cleared.';
   },
 };
 
 export const skillsCommand: Command = {
   name: 'skills',
-  description: 'List available skills',
+  description: 'List available skills (v1 and v2)',
   execute: async (_args, ctx) => {
-    const list = ctx.skills.list();
-    if (list.length === 0) return 'No skills loaded.';
-    return 'Available skills:\n' + list.map((s) => `  /${s.name} - ${s.description}`).join('\n');
+    const v1 = ctx.skills.list();
+    const v2 = getSkillIndex();
+    const lines: string[] = [];
+
+    if (v1.length > 0) {
+      lines.push('Built-in skills (v1):');
+      for (const s of v1) {
+        lines.push(`  /${s.name} - ${s.description}`);
+      }
+    }
+
+    if (v2.length > 0) {
+      if (lines.length > 0) lines.push('');
+      lines.push('Custom skills (v2):');
+      for (const e of v2) {
+        const cat = e.category ? ` [${e.category}]` : '';
+        lines.push(`  /${e.name}${cat} - ${e.description}`);
+      }
+    }
+
+    if (lines.length === 0) return 'No skills loaded.';
+    return lines.join('\n');
+  },
+};
+
+export const defaultCommand: Command = {
+  name: 'default',
+  description: 'Exit all active skills and return to default mode',
+  execute: async (_args, ctx) => {
+    ctx.agent.setActiveSkill(null);
+    skillScopeManager.exitAll('user_command');
+    const active = skillScopeManager.getActiveSkillNames();
+    if (active.length === 0) {
+      return 'Returned to default mode. No active skills.';
+    }
+    return `Returned to default mode. Exited: ${active.join(', ')}`;
   },
 };
 
@@ -74,7 +110,7 @@ Session:
 
 System:
   /plan, /act, /permissions, /theme [name]
-  /skills, /model, /doctor, /config [key value]
+  /skills, /default, /model, /doctor, /config [key value]
   /env, /version, /help, /quit
 
 Context:

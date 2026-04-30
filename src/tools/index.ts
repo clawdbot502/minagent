@@ -18,6 +18,14 @@ import { LSPTool } from './LSPTool.js';
 import { MCPTool } from './MCPTool.js';
 import { TreeTool } from './TreeTool.js';
 import { CodeExecuteTool } from './CodeExecuteTool.js';
+import {
+  SkillManageTool,
+  SkillViewTool,
+  SkillExitTool,
+  SkillsListTool,
+  SkillCuratorTool,
+  SkillPinTool,
+} from '../skills-v2/tools.js';
 import type { ToolRegistry } from './types.js';
 
 export const defaultTools: ToolRegistry = {
@@ -41,10 +49,16 @@ export const defaultTools: ToolRegistry = {
   [MCPTool.name]: MCPTool,
   [TreeTool.name]: TreeTool,
   [CodeExecuteTool.name]: CodeExecuteTool,
+  [SkillManageTool.name]: SkillManageTool,
+  [SkillViewTool.name]: SkillViewTool,
+  [SkillExitTool.name]: SkillExitTool,
+  [SkillsListTool.name]: SkillsListTool,
+  [SkillCuratorTool.name]: SkillCuratorTool,
+  [SkillPinTool.name]: SkillPinTool,
 };
 
 export const DESTRUCTIVE_TOOLS = new Set([
-  'BashTool', 'FileWriteTool', 'FileEditTool', 'DeleteTool', 'CodeExecuteTool', 'AgentTool', 'NotebookEditTool', 'MCPTool', 'ScheduleTool',
+  'BashTool', 'FileWriteTool', 'FileEditTool', 'DeleteTool', 'CodeExecuteTool', 'AgentTool', 'NotebookEditTool', 'MCPTool', 'ScheduleTool', 'SkillManageTool',
 ]);
 
 export const READONLY_TOOLS = new Set([

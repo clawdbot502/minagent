@@ -12,6 +12,10 @@ import { CostTracker } from '../utils/costTracker.js';
 import { createCommandRegistry, executeCommand } from '../commands/registry.js';
 import { saveSessionState, archiveSessionState } from '../state/session.js';
 import { parseApprovalInput, shouldIgnoreSubmit } from '../utils/approvalInput.js';
+import { findSkillDir } from '../skills-v2/discovery.js';
+import { buildSkillInvocationMessage } from '../skills-v2/prompt.js';
+import { skillView } from '../skills-v2/viewer.js';
+import { skillScopeManager } from '../skills-v2/scope.js';
 
 interface AppProps {
   config: Config;
@@ -26,6 +30,7 @@ export function App({ config, tools, skills }: AppProps) {
   const [currentStream, setCurrentStream] = useState('');
   const [currentReasoning, setCurrentReasoning] = useState('');
   const [activeSkill, setActiveSkill] = useState<string | null>(null);
+  const [v2ActiveSkills, setV2ActiveSkills] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const pendingPermissionRef = useRef<{ resolve: (v: boolean) => void } | null>(null);
   const pendingPlanRef = useRef<{ resolve: (v: boolean) => void } | null>(null);
@@ -64,6 +69,7 @@ export function App({ config, tools, skills }: AppProps) {
     setMessages(extraMessage ? [...nextMessages, extraMessage] : [...nextMessages]);
     setContextFiles(agentRef.current.getContextFilePaths());
     setActiveSkill(agentRef.current.getActiveSkill());
+    setV2ActiveSkills(skillScopeManager.getActiveSkillNames());
   }, []);
 
   const handlePermission = useCallback(async (toolName: string, args: Record<string, unknown>): Promise<boolean> => {
@@ -149,8 +155,12 @@ export function App({ config, tools, skills }: AppProps) {
           return;
         }
 
-        // Check for skill switch
-        const skillName = input.slice(1).trim();
+        // Check for v1 skill switch
+        const afterSlash = input.slice(1).trim();
+        const spaceIdx = afterSlash.indexOf(' ');
+        const skillName = spaceIdx > 0 ? afterSlash.slice(0, spaceIdx) : afterSlash;
+        const userInstruction = spaceIdx > 0 ? afterSlash.slice(spaceIdx + 1).trim() : '';
+
         if (skills.has(skillName)) {
           agentRef.current.setActiveSkill(skillName);
           setActiveSkill(skillName);
@@ -160,6 +170,88 @@ export function App({ config, tools, skills }: AppProps) {
           };
           syncFromAgent(systemMsg);
           return;
+        }
+
+        // Check for v2 skill invocation
+        const v2SkillDir = findSkillDir(skillName);
+        if (v2SkillDir) {
+          const viewResult = await skillView({ name: skillName });
+          try {
+            const parsed = JSON.parse(viewResult);
+            if (parsed.success) {
+              if (!skillScopeManager.isActive(skillName)) {
+                skillScopeManager.enter(skillName, 'turn');
+              }
+              const invocationMsg = buildSkillInvocationMessage(
+                skillName,
+                parsed.content,
+                parsed.skillDir,
+                parsed.linkedFiles || [],
+                userInstruction || 'User invoked this skill via slash command.'
+              );
+              setIsProcessing(true);
+              setCurrentStream('');
+              setCurrentReasoning('');
+
+              const userMsg: Message = { role: 'user', content: input };
+              setMessages((prev) => [...prev, userMsg]);
+
+              let streamingMsg: Message = { role: 'assistant', content: '' };
+
+              await agentRef.current.sendMessage(invocationMsg, {
+                onStreamChunk: (text) => {
+                  setCurrentStream((prev) => prev + text);
+                  streamingMsg.content += text;
+                },
+                onReasoning: (text) => {
+                  setCurrentReasoning((prev) => prev + text);
+                },
+                onToolCalls: (calls) => {
+                  streamingMsg.toolCalls = calls;
+                },
+                onToolResults: (results) => {
+                  if (streamingMsg.toolCalls) {
+                    const callId = streamingMsg.toolCalls.map((c) => c.id).join(',');
+                    toolResultsRef.current.set(callId, results);
+                  }
+                  setMessages((prev) => {
+                    const last = prev[prev.length - 1];
+                    if (last?.role === 'assistant') {
+                      return [...prev.slice(0, -1), { ...streamingMsg }];
+                    }
+                    return [...prev, { ...streamingMsg }];
+                  });
+                },
+                onPermissionRequest: handlePermission,
+                onPlanRequest: handlePlan,
+                onUserQuestion: handleUserQuestion,
+                onComplete: () => {
+                  setMessages((prev) => {
+                    const last = prev[prev.length - 1];
+                    if (last?.role === 'assistant') {
+                      return [...prev.slice(0, -1), { ...streamingMsg }];
+                    }
+                    return [...prev, { ...streamingMsg }];
+                  });
+                  setCurrentStream('');
+                  setCurrentReasoning('');
+                },
+                onCompaction: (summary) => {
+                  const compactMsg: Message = { role: 'system', content: summary };
+                  setMessages((prev) => [...prev, compactMsg]);
+                },
+                onError: (err) => {
+                  setError(err);
+                  setIsProcessing(false);
+                },
+              });
+
+              setIsProcessing(false);
+              return;
+            }
+          } catch {
+            // Not a valid skill view result, fall through
+          }
         }
       }
 
@@ -232,7 +324,7 @@ export function App({ config, tools, skills }: AppProps) {
       <Box paddingY={1}>
         <Text dimColor>
           MinAgent | {config.model} | {contextFiles.length > 0 ? `${contextFiles.length} ctx files | ` : ''}
-          {activeSkill ? `[${activeSkill}]` : 'default mode'}
+          {activeSkill ? `[${activeSkill}]` : v2ActiveSkills.length > 0 ? `[${v2ActiveSkills.join(', ')}]` : 'default mode'}
         </Text>
       </Box>
 
