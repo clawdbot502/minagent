@@ -48,17 +48,42 @@ export const SkillManageTool: Tool<typeof SkillManageSchema> = {
 const SkillViewSchema = z.object({
   name: z.string().describe('Skill name to load'),
   file_path: z.string().optional().describe('Optional supporting file path to load instead of SKILL.md'),
+  mode: z.enum(['turn', 'session']).optional().describe('Scope mode: turn = active for this response only (default), session = active for the entire session'),
 });
 
 export const SkillViewTool: Tool<typeof SkillViewSchema> = {
   name: 'SkillViewTool',
-  description: 'Load a skill\'s full content or a specific supporting file. Use before invoking a skill to understand its instructions, or to read references/templates.',
+  description: 'Load a skill\'s full content and enter its scope. Use when the user\'s task matches an available skill. After loading, follow the skill instructions in your next response. Use mode=session to keep the skill active across multiple turns.',
   schema: SkillViewSchema,
   async execute(args) {
     return skillView({
       name: args.name,
       filePath: args.file_path,
+      mode: args.mode,
     });
+  },
+};
+
+const SkillExitSchema = z.object({
+  name: z.string().optional().describe('Skill name to exit. Omit to exit all active skills.'),
+});
+
+export const SkillExitTool: Tool<typeof SkillExitSchema> = {
+  name: 'SkillExitTool',
+  description: 'Exit an active skill scope. Use when the skill\'s task is complete or the user wants to return to default mode.',
+  schema: SkillExitSchema,
+  async execute(args) {
+    if (args.name) {
+      const scopes = skillScopeManager.activeScopes();
+      const target = scopes.find((s) => s.skillName === args.name);
+      if (target) {
+        skillScopeManager.exit(target.invocationId, 'explicit_exit');
+        return `Exited skill "${args.name}".`;
+      }
+      return `Skill "${args.name}" is not currently active.`;
+    }
+    skillScopeManager.exitAll('explicit_exit');
+    return 'Exited all active skills.';
   },
 };
 

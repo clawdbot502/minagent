@@ -50,8 +50,14 @@ export function buildSkillsSystemPrompt(): string {
   const lines: string[] = [
     '## Skills',
     '',
-    'Before replying, scan the skills below.',
-    'If one clearly matches the task, load it with skill_view(name) and follow it.',
+    'Before replying, scan the available skills below.',
+    'If one clearly matches the user\'s task, follow this protocol:',
+    '',
+    '1. Load the skill with SkillViewTool(name=<skill_name>). This gives you the full instructions.',
+    '2. After loading, the skill enters scope and its instructions appear in the tool result.',
+    '3. Follow those instructions in your next response.',
+    '4. Use mode=session if the skill should stay active across multiple turns.',
+    '5. Use SkillExitTool(name=<skill_name>) when the skill task is complete.',
     '',
     '<available_skills>',
   ];

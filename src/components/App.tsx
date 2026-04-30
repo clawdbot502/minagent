@@ -15,6 +15,7 @@ import { parseApprovalInput, shouldIgnoreSubmit } from '../utils/approvalInput.j
 import { findSkillDir } from '../skills-v2/discovery.js';
 import { buildSkillInvocationMessage } from '../skills-v2/prompt.js';
 import { skillView } from '../skills-v2/viewer.js';
+import { skillScopeManager } from '../skills-v2/scope.js';
 
 interface AppProps {
   config: Config;
@@ -176,6 +177,9 @@ export function App({ config, tools, skills }: AppProps) {
           try {
             const parsed = JSON.parse(viewResult);
             if (parsed.success) {
+              if (!skillScopeManager.isActive(skillName)) {
+                skillScopeManager.enter(skillName, 'turn');
+              }
               const invocationMsg = buildSkillInvocationMessage(
                 skillName,
                 parsed.content,

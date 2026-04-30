@@ -12,6 +12,7 @@ import {
 import { findSkillDir, discoverLinkedFiles } from './discovery.js';
 import { bumpView } from './telemetry.js';
 import { preprocessSkillContent, loadSupportingFile } from './preprocess.js';
+import { skillScopeManager } from './scope.js';
 
 export async function skillView(args: SkillViewArgs): Promise<string> {
   const skillDir = findSkillDir(args.name);
@@ -52,6 +53,12 @@ export async function skillView(args: SkillViewArgs): Promise<string> {
 
   bumpView(args.name);
 
+  // Enter scope if not already active for this skill
+  const mode = args.mode || 'turn';
+  if (!skillScopeManager.isActive(args.name)) {
+    skillScopeManager.enter(args.name, mode, mode === 'session' ? processed : undefined);
+  }
+
   const result: SkillLoadResult = {
     success: true,
     name: meta.name || args.name,
@@ -61,5 +68,24 @@ export async function skillView(args: SkillViewArgs): Promise<string> {
     linkedFiles,
   };
 
-  return JSON.stringify(result, null, 2);
+  // Return LLM-friendly format with JSON at the end for structured access
+  const parts: string[] = [
+    `[SKILL LOADED: ${result.name}]`,
+    `Description: ${result.description}`,
+    '',
+    '--- Skill Instructions ---',
+    processed,
+    '--- End Skill Instructions ---',
+  ];
+
+  if (linkedFiles.length > 0) {
+    parts.push('', `Linked files: ${linkedFiles.join(', ')}`);
+  }
+
+  parts.push('', `[Scope: ${mode}. Use SkillExitTool to exit this skill.]`);
+  parts.push('', '<skill_json>');
+  parts.push(JSON.stringify(result, null, 2));
+  parts.push('</skill_json>');
+
+  return parts.join('\n');
 }

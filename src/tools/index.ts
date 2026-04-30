@@ -21,6 +21,7 @@ import { CodeExecuteTool } from './CodeExecuteTool.js';
 import {
   SkillManageTool,
   SkillViewTool,
+  SkillExitTool,
   SkillsListTool,
   SkillCuratorTool,
   SkillPinTool,
@@ -50,6 +51,7 @@ export const defaultTools: ToolRegistry = {
   [CodeExecuteTool.name]: CodeExecuteTool,
   [SkillManageTool.name]: SkillManageTool,
   [SkillViewTool.name]: SkillViewTool,
+  [SkillExitTool.name]: SkillExitTool,
   [SkillsListTool.name]: SkillsListTool,
   [SkillCuratorTool.name]: SkillCuratorTool,
   [SkillPinTool.name]: SkillPinTool,

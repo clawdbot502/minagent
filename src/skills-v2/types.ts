@@ -99,6 +99,7 @@ export interface SkillManageArgs {
 export interface SkillViewArgs {
   name: string;
   filePath?: string;
+  mode?: SkillScopeMode;
 }
 
 export interface SkillsListArgs {

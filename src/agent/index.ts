@@ -14,8 +14,9 @@ import { recordMessage } from '../state/session.js';
 import { shouldCompact, compactMessages, estimateTokens } from '../utils/compaction.js';
 import { classifyLLMError } from '../utils/llmErrors.js';
 import { ChangesetTracker, runWithChangeset } from '../utils/changeset.js';
-import { buildSkillsSystemPrompt } from '../skills-v2/prompt.js';
+import { buildSkillsSystemPrompt, buildPreloadedSkillsPrompt } from '../skills-v2/prompt.js';
 import { skillScopeManager } from '../skills-v2/scope.js';
+import { skillView } from '../skills-v2/viewer.js';
 import { readFileSync } from 'fs';
 import { spawnSync } from 'child_process';
 
@@ -200,6 +201,14 @@ Node/Bun version: ${process.version}`;
     const skillsIndex = buildSkillsSystemPrompt();
     if (skillsIndex) {
       systemPrompt += '\n\n' + skillsIndex;
+    }
+
+    // Inject active session-level skills content
+    const sessionSkills = skillScopeManager.getSessionContent();
+    if (sessionSkills.size > 0) {
+      for (const [name, content] of sessionSkills) {
+        systemPrompt += `\n\n[SESSION SKILL ACTIVE: ${name}]\n${content}\n[END SESSION SKILL]`;
+      }
     }
 
     return systemPrompt;

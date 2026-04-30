@@ -4,8 +4,9 @@ import { bumpUse } from './telemetry.js';
 class SkillScopeManager {
   private scopes = new Map<string, SkillScope>();
   private idCounter = 0;
+  private sessionContent = new Map<string, string>();
 
-  enter(skillName: string, mode: SkillScopeMode): string {
+  enter(skillName: string, mode: SkillScopeMode, content?: string): string {
     const invocationId = `scope-${Date.now()}-${++this.idCounter}`;
     const scope: SkillScope = {
       skillName,
@@ -14,6 +15,9 @@ class SkillScopeManager {
       enteredAt: new Date().toISOString(),
     };
     this.scopes.set(invocationId, scope);
+    if (mode === 'session' && content) {
+      this.sessionContent.set(skillName, content);
+    }
     bumpUse(skillName);
     return invocationId;
   }
@@ -23,8 +27,10 @@ class SkillScopeManager {
     if (!scope) return false;
     scope.exitedAt = new Date().toISOString();
     scope.exitReason = reason;
-    // Keep in map for history, but mark as inactive
     this.scopes.set(invocationId, scope);
+    if (scope.mode === 'session') {
+      this.sessionContent.delete(scope.skillName);
+    }
     return true;
   }
 
@@ -38,6 +44,10 @@ class SkillScopeManager {
 
   getActiveSkillNames(): string[] {
     return [...new Set(this.activeScopes().map((s) => s.skillName))];
+  }
+
+  getSessionContent(): Map<string, string> {
+    return new Map(this.sessionContent);
   }
 
   exitAll(reason = 'cleanup'): void {
